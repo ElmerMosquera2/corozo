@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Corozo - Markdown a Presentaciones</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f5f7fb;
+      color: #1d2430;
+    }
+    main {
+      display: grid;
+      gap: 1rem;
+      padding: 1rem;
+      grid-template-columns: minmax(280px, 1fr) minmax(320px, 1fr);
+      min-height: 100vh;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #dbe1ee;
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+      min-height: 0;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+    textarea {
+      width: 100%;
+      min-height: 320px;
+      flex: 1;
+      resize: vertical;
+      border-radius: 8px;
+      border: 1px solid #c9d3e6;
+      padding: .8rem;
+      font-size: .95rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .actions, .nav {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: .55rem .85rem;
+      background: #2259d6;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.secondary {
+      background: #e6ebf7;
+      color: #1d2430;
+    }
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .status {
+      font-size: .9rem;
+      color: #4e5b73;
+    }
+    .viewer {
+      border-radius: 10px;
+      border: 1px solid #cdd7ea;
+      background: linear-gradient(160deg, #ffffff, #f8faff);
+      padding: 0;
+      min-height: 320px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .slides {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 1.2rem;
+      overflow: auto;
+      display: none;
+    }
+    .slide.active { display: block; }
+    .slide h1, .slide h2, .slide h3 { margin-top: 0; }
+    .slide img {
+      max-width: 100%;
+      max-height: 44vh;
+      border-radius: 8px;
+      display: block;
+      margin: .5rem auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: .5rem 0;
+      font-size: .92rem;
+    }
+    th, td {
+      border: 1px solid #cdd7ea;
+      padding: .4rem .5rem;
+      text-align: left;
+    }
+    .help { font-size: .85rem; color: #5c6881; margin: 0; }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      textarea { min-height: 220px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <section class="panel">
+    <h1>Markdown de entrada</h1>
+    <p class="help">Separa diapositivas con una línea que solo contenga <code>---</code>.</p>
+    <textarea id="markdownInput"># Corozo
+## Presentación de ejemplo
+
+- Soporte de títulos
+- Listas
+- Tablas e imágenes
+
+---
+
+## Tabla
+
+| Tema | Estado |
+| ---- | ------ |
+| Parser | ✅ |
+| Exportación HTML | ✅ |
+
+---
+
+## Imagen
+
+![Logo](https://upload.wikimedia.org/wikipedia/commons/4/48/Markdown-mark.svg)</textarea>
+    <div class="actions">
+      <button id="generateBtn">Generar presentación</button>
+      <button id="downloadBtn" class="secondary">Descargar HTML</button>
+    </div>
+    <p id="status" class="status" aria-live="polite"></p>
+  </section>
+
+  <section class="panel">
+    <h1>Preview</h1>
+    <div class="viewer">
+      <div id="slidesContainer" class="slides"></div>
+      <div class="nav" style="padding:.7rem;border-top:1px solid #d8e0ef;">
+        <button id="prevBtn" class="secondary" aria-label="Diapositiva anterior">← Anterior</button>
+        <button id="nextBtn" class="secondary" aria-label="Siguiente diapositiva">Siguiente →</button>
+        <span id="counter" class="status"></span>
+      </div>
+    </div>
+    <p class="help">Navega con los botones o con las teclas ← y →.</p>
+  </section>
+</main>
+
+<script>
+  const input = document.getElementById('markdownInput');
+  const statusEl = document.getElementById('status');
+  const slidesContainer = document.getElementById('slidesContainer');
+  const counterEl = document.getElementById('counter');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  let slides = [];
+  let currentSlide = 0;
+
+  function escapeHtml(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function toSafeHttpUrl(url) {
+    try {
+      const parsed = new URL(url, window.location.href);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function splitSlides(markdown) {
+    const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+    const sections = [[]];
+    for (const line of lines) {
+      if (/^\s*---\s*$/.test(line)) {
+        sections.push([]);
+      } else {
+        sections[sections.length - 1].push(line);
+      }
+    }
+    return sections.map((s) => s.join('\n').trim()).filter(Boolean);
+  }
+
+  function parseInline(line) {
+    const imageMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)\s*$/);
+    if (!imageMatch) return null;
+    const [, alt, rawUrl] = imageMatch;
+    const safeUrl = toSafeHttpUrl(rawUrl.trim());
+    if (!safeUrl) return '<p>Imagen ignorada por URL inválida o no segura.</p>';
+    return `<img src="${escapeHtml(safeUrl)}" alt="${escapeHtml(alt)}" loading="lazy">`;
+  }
+
+  function parseTable(lines, startIndex) {
+    if (startIndex + 1 >= lines.length) return null;
+    const header = lines[startIndex];
+    const sep = lines[startIndex + 1];
+    if (!header.includes('|')) return null;
+    if (!/^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?\s*$/.test(sep)) return null;
+
+    const rows = [];
+    const normalizeRow = (row) =>
+      row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+
+    rows.push(normalizeRow(header));
+    let idx = startIndex + 2;
+    while (idx < lines.length && lines[idx].includes('|') && lines[idx].trim() !== '') {
+      rows.push(normalizeRow(lines[idx]));
+      idx += 1;
+    }
+    const [head, ...body] = rows;
+    const tableHtml = `
+      <table>
+        <thead><tr>${head.map((c) => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+        <tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>
+    `;
+    return { html: tableHtml, nextIndex: idx };
+  }
+
+  function parseSection(sectionText) {
+    const lines = sectionText.split('\n');
+    const html = [];
+    let i = 0;
+    while (i < lines.length) {
+      const raw = lines[i];
+      const line = raw.trim();
+
+      if (!line) {
+        i += 1;
+        continue;
+      }
+
+      const table = parseTable(lines, i);
+      if (table) {
+        html.push(table.html);
+        i = table.nextIndex;
+        continue;
+      }
+
+      const image = parseInline(line);
+      if (image) {
+        html.push(image);
+        i += 1;
+        continue;
+      }
+
+      const heading = line.match(/^(#{1,6})\s+(.+)$/);
+      if (heading) {
+        const level = heading[1].length;
+        html.push(`<h${level}>${escapeHtml(heading[2])}</h${level}>`);
+        i += 1;
+        continue;
+      }
+
+      if (/^[-*]\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
+          items.push(lines[i].trim().replace(/^[-*]\s+/, ''));
+          i += 1;
+        }
+        html.push(`<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`);
+        continue;
+      }
+
+      if (/^\d+\.\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
+          items.push(lines[i].trim().replace(/^\d+\.\s+/, ''));
+          i += 1;
+        }
+        html.push(`<ol>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ol>`);
+        continue;
+      }
+
+      html.push(`<p>${escapeHtml(line)}</p>`);
+      i += 1;
+    }
+    return html.join('\n');
+  }
+
+  function buildSlides(markdown) {
+    const contentSlides = splitSlides(markdown).map(parseSection);
+    const normalized = contentSlides.length ? contentSlides : ['<h1>Nueva presentación</h1>'];
+    normalized.push('<h2>Fin de presentación</h2>');
+    return normalized;
+  }
+
+  function showSlide(index) {
+    currentSlide = Math.max(0, Math.min(index, slides.length - 1));
+    const allSlides = slidesContainer.querySelectorAll('.slide');
+    allSlides.forEach((slide, idx) => {
+      slide.classList.toggle('active', idx === currentSlide);
+    });
+    prevBtn.disabled = currentSlide === 0;
+    nextBtn.disabled = currentSlide === slides.length - 1;
+    counterEl.textContent = `${currentSlide + 1} / ${slides.length}`;
+  }
+
+  function renderPreview() {
+    slides = buildSlides(input.value);
+    slidesContainer.innerHTML = slides
+      .map((slide, idx) => `<section class="slide ${idx === 0 ? 'active' : ''}">${slide}</section>`)
+      .join('');
+    showSlide(0);
+    statusEl.textContent = `Presentación generada: ${slides.length} diapositivas.`;
+  }
+
+  function exportStandaloneHtml(slideContent) {
+    const escapedSlides = JSON.stringify(slideContent).replace(/</g, '\\u003c');
+    return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presentación Corozo</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f6f8fc;color:#1f2937}
+    .wrap{max-width:1100px;margin:0 auto;padding:12px}
+    .viewer{border:1px solid #d3dced;border-radius:12px;background:#fff;min-height:75vh;display:flex;flex-direction:column;overflow:hidden}
+    .slides{position:relative;flex:1;overflow:hidden}.slide{position:absolute;inset:0;padding:1.3rem;overflow:auto;display:none}.slide.active{display:block}
+    .controls{display:flex;gap:8px;align-items:center;border-top:1px solid #d3dced;padding:10px}
+    button{border:0;border-radius:8px;padding:.55rem .8rem;background:#e8edf7;color:#1f2937;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}img{max-width:100%;max-height:50vh;display:block;margin:.5rem auto;border-radius:8px}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #d3dced;padding:.42rem .5rem;text-align:left}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="viewer">
+      <div class="slides" id="slides"></div>
+      <div class="controls">
+        <button id="prev">← Anterior</button>
+        <button id="next">Siguiente →</button>
+        <span id="counter"></span>
+      </div>
+    </div>
+  </div>
+  <script>
+    const slides = ${escapedSlides};
+    const container = document.getElementById('slides');
+    const counter = document.getElementById('counter');
+    const prev = document.getElementById('prev');
+    const next = document.getElementById('next');
+    let current = 0;
+    container.innerHTML = slides.map((s, i) => '<section class="slide ' + (i === 0 ? 'active' : '') + '">' + s + '</section>').join('');
+    function render(index){
+      current = Math.max(0, Math.min(index, slides.length - 1));
+      [...container.children].forEach((node, i)=>node.classList.toggle('active', i === current));
+      prev.disabled = current === 0;
+      next.disabled = current === slides.length - 1;
+      counter.textContent = (current + 1) + ' / ' + slides.length;
+    }
+    prev.addEventListener('click', ()=>render(current - 1));
+    next.addEventListener('click', ()=>render(current + 1));
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft') render(current - 1);
+      if (event.key === 'ArrowRight') render(current + 1);
+    });
+    render(0);
+  <\/script>
+</body>
+</html>`;
+  }
+
+  function downloadHtml() {
+    if (!slides.length) renderPreview();
+    const html = exportStandaloneHtml(slides);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'presentacion-corozo.html';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    statusEl.textContent = 'Archivo HTML generado y descargado.';
+  }
+
+  document.getElementById('generateBtn').addEventListener('click', renderPreview);
+  downloadBtn.addEventListener('click', downloadHtml);
+  prevBtn.addEventListener('click', () => showSlide(currentSlide - 1));
+  nextBtn.addEventListener('click', () => showSlide(currentSlide + 1));
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowLeft') showSlide(currentSlide - 1);
+    if (event.key === 'ArrowRight') showSlide(currentSlide + 1);
+  });
+  renderPreview();
+</script>
+</body>
+</html>
