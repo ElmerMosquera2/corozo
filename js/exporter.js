@@ -45,9 +45,11 @@ function toStandaloneHtml(slides, design) {
       const imgStyle = slide.image ? ` style="--cover-img:url('${esc(slide.image)}')"` : '';
       html = `<section class="slide cover"${imgStyle}>
         <div class="cover-inner">
-          <div>
-            <h1>${esc(slide.title)}</h1>
-            ${slide.subtitle ? `<p class="subtitle">${esc(slide.subtitle)}</p>` : ''}
+          <div class="slide-body">
+            <div>
+              <h1>${esc(slide.title)}</h1>
+              ${slide.subtitle ? `<p class="subtitle">${esc(slide.subtitle)}</p>` : ''}
+            </div>
           </div>
         </div>
       </section>`;
@@ -55,7 +57,7 @@ function toStandaloneHtml(slides, design) {
       const quoteBlock = slide.blocks.find(b => b.k === 'quote');
       const qt = quoteBlock ? quoteBlock.t : (slide.blocks.find(b => b.k === 'p')?.t || '');
       html = `<section class="slide closing">
-        <div>
+        <div class="slide-body">
           <p class="closing-quote">${esc(qt)}</p>
         </div>
       </section>`;
@@ -63,14 +65,16 @@ function toStandaloneHtml(slides, design) {
       const hasImage = !!slide.image;
       const label = slide.label || slide.title || `Diapositiva ${i + 1}`;
       html = `<section class="slide">
-        ${slide.title ? `<div class="eyebrow">${esc(label)}</div>
-        <h2 class="title">${esc(slide.title)}</h2>` : ''}
-        <div class="content-grid${hasImage ? '' : ' no-image'}">
-          <div>${renderBlocks(slide.blocks)}</div>
-          ${hasImage ? `<figure class="figure">
-            <img src="${esc(slide.image)}" alt="" loading="lazy">
-            <figcaption>Diapositiva ${i + 1}</figcaption>
-          </figure>` : ''}
+        <div class="slide-body">
+          ${slide.title ? `<div class="eyebrow">${esc(label)}</div>
+          <h2 class="title">${esc(slide.title)}</h2>` : ''}
+          <div class="content-grid${hasImage ? '' : ' no-image'}">
+            <div>${renderBlocks(slide.blocks)}</div>
+            ${hasImage ? `<figure class="figure">
+              <img src="${esc(slide.image)}" alt="" loading="lazy">
+              <figcaption>Diapositiva ${i + 1}</figcaption>
+            </figure>` : ''}
+          </div>
         </div>
       </section>`;
     }
@@ -134,8 +138,15 @@ function toStandaloneHtml(slides, design) {
     position:absolute; inset:0; overflow:auto; display:none;
     padding:4.2rem 5rem 3rem;
     font-family:var(--slide-font);
-    font-size:calc(1rem * var(--slide-scale));
+  }
+  .slide-body{
+    transform-origin:top center;
+    transform:scale(var(--slide-scale));
     text-align:var(--slide-align, left);
+  }
+  .cover .slide-body,
+  .slide.closing .slide-body{
+    transform-origin:center center;
   }
   .slide.active{display:block; animation:rise .5s cubic-bezier(.16,1,.3,1);}
   @keyframes rise{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
@@ -193,7 +204,7 @@ function toStandaloneHtml(slides, design) {
   .slide.closing.active{display:flex; align-items:center; justify-content:center;}
   .closing-quote{
     font-family:var(--serif); font-style:italic; font-weight:500;
-    font-size:clamp(1.5rem, 3vw, 2.3rem); line-height:1.45; text-align:center; max-width:34ch;
+    font-size:clamp(1.5rem, 3vw, 2.3rem); line-height:1.45; max-width:34ch;
     color:var(--ink); position:relative;
   }
   .closing-quote::before{content:'\\201c'; color:var(--accent); font-size:1.4em; display:block; margin-bottom:.1em; font-family:var(--serif);}
@@ -248,7 +259,7 @@ var current = 0;
 function renderSlide(s, i, total) {
   if (i === 0) {
     var imgStyle = s.image ? ' style="--cover-img:url(' + JSON.stringify(s.image) + ')"' : '';
-    return '<section class="slide cover"' + imgStyle + '><div class="cover-inner"><div><h1>' + esc(s.title) + '</h1>' + (s.subtitle ? '<p class="subtitle">' + esc(s.subtitle) + '</p>' : '') + '</div></div></section>';
+    return '<section class="slide cover"' + imgStyle + '><div class="cover-inner"><div class="slide-body"><div><h1>' + esc(s.title) + '</h1>' + (s.subtitle ? '<p class="subtitle">' + esc(s.subtitle) + '</p>' : '') + '</div></div></div></section>';
   }
   var isLast = i === total - 1;
   var isShort = s.blocks.length <= 2 && (s.blocks.some(function(b){return b.k==='quote';}) || s.blocks.every(function(b){return b.k==='p'||b.k==='h2'||b.k==='h3';}));
@@ -256,12 +267,12 @@ function renderSlide(s, i, total) {
     var qt = '';
     for (var b = 0; b < s.blocks.length; b++) { if (s.blocks[b].k === 'quote') { qt = s.blocks[b].t; break; } }
     if (!qt) { for (var b = 0; b < s.blocks.length; b++) { if (s.blocks[b].k === 'p') { qt = s.blocks[b].t; break; } } }
-    return '<section class="slide closing"><div><p class="closing-quote">' + esc(qt) + '</p></div></section>';
+    return '<section class="slide closing"><div class="slide-body"><p class="closing-quote">' + esc(qt) + '</p></div></section>';
   }
   var hasImage = !!s.image;
   var bodyHtml = renderBlocks(s.blocks);
   var lbl = s.label || s.title || 'Diapositiva ' + (i + 1);
-  return '<section class="slide">' + (s.title ? '<div class="eyebrow">' + esc(lbl) + '</div><h2 class="title">' + esc(s.title) + '</h2>' : '') + '<div class="content-grid' + (hasImage ? '' : ' no-image') + '"><div>' + bodyHtml + '</div>' + (hasImage ? '<figure class="figure"><img src="' + esc(s.image) + '" alt="" loading="lazy"><figcaption>Diapositiva ' + (i+1) + '</figcaption></figure>' : '') + '</div></section>';
+  return '<section class="slide"><div class="slide-body">' + (s.title ? '<div class="eyebrow">' + esc(lbl) + '</div><h2 class="title">' + esc(s.title) + '</h2>' : '') + '<div class="content-grid' + (hasImage ? '' : ' no-image') + '"><div>' + bodyHtml + '</div>' + (hasImage ? '<figure class="figure"><img src="' + esc(s.image) + '" alt="" loading="lazy"><figcaption>Diapositiva ' + (i+1) + '</figcaption></figure>' : '') + '</div></div></section>';
 }
 
 function fmt(t) {

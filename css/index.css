@@ -323,8 +323,15 @@ svg.wave{display:block;width:100%;height:46px;}
   display:none;
   padding:4.2rem 5rem 3rem;
   font-family:var(--slide-font);
-  font-size:calc(1rem * var(--slide-scale));
+}
+.slide-body{
+  transform-origin:top center;
+  transform:scale(var(--slide-scale));
   text-align:var(--slide-align, left);
+}
+.cover .slide-body,
+.slide.closing .slide-body{
+  transform-origin:center center;
 }
 .slide.active{
   display:block;
@@ -494,7 +501,6 @@ blockquote{
   font-weight:500;
   font-size:clamp(1.5rem, 3vw, 2.3rem);
   line-height:1.45;
-  text-align:center;
   max-width:34ch;
   color:var(--ink);
   position:relative;

@@ -39,9 +39,11 @@ function coverSlide(slide, index) {
   const imgStyle = slide.image ? ` style="--cover-img:url('${slide.image}')"` : '';
   return `<section class="slide cover"${imgStyle}>
     <div class="cover-inner">
-      <div>
-        <h1>${esc(slide.title)}</h1>
-        ${slide.subtitle ? `<p class="subtitle">${esc(slide.subtitle)}</p>` : ''}
+      <div class="slide-body">
+        <div>
+          <h1>${esc(slide.title)}</h1>
+          ${slide.subtitle ? `<p class="subtitle">${esc(slide.subtitle)}</p>` : ''}
+        </div>
       </div>
     </div>
   </section>`;
@@ -50,14 +52,16 @@ function coverSlide(slide, index) {
 function contentSlide(slide, index) {
   const hasImage = !!slide.image;
   return `<section class="slide">
-    ${slide.title ? `<div class="eyebrow">${esc(slide.label)}</div>
-    <h2 class="title">${esc(slide.title)}</h2>` : ''}
-    <div class="content-grid${hasImage ? '' : ' no-image'}">
-      <div>${renderBlocks(slide.blocks)}</div>
-      ${hasImage ? `<figure class="figure">
-        <img src="${slide.image}" alt="" loading="lazy" onerror="this.closest('.figure').style.display='none'">
-        <figcaption>Diapositiva ${index + 1}</figcaption>
-      </figure>` : ''}
+    <div class="slide-body">
+      ${slide.title ? `<div class="eyebrow">${esc(slide.label)}</div>
+      <h2 class="title">${esc(slide.title)}</h2>` : ''}
+      <div class="content-grid${hasImage ? '' : ' no-image'}">
+        <div>${renderBlocks(slide.blocks)}</div>
+        ${hasImage ? `<figure class="figure">
+          <img src="${slide.image}" alt="" loading="lazy" onerror="this.closest('.figure').style.display='none'">
+          <figcaption>Diapositiva ${index + 1}</figcaption>
+        </figure>` : ''}
+      </div>
     </div>
   </section>`;
 }
@@ -66,7 +70,7 @@ function closingSlide(slide) {
   const quoteBlock = slide.blocks.find(b => b.k === 'quote');
   const quoteText = quoteBlock ? quoteBlock.t : (slide.blocks.find(b => b.k === 'p')?.t || '');
   return `<section class="slide closing">
-    <div>
+    <div class="slide-body">
       <p class="closing-quote">${esc(quoteText)}</p>
     </div>
   </section>`;

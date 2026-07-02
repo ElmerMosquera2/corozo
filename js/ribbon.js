@@ -5,6 +5,8 @@
 
 const state = {
   activeTab: null,
+  currentDesign: null,
+  onDesignChange: null,
 };
 
 const FONTS = [
@@ -70,7 +72,7 @@ function buildInicioPanel(design, onDesignChange) {
     fontSelect.appendChild(opt);
   });
   fontSelect.addEventListener("change", () => {
-    onDesignChange({ ...design, fontFamily: fontSelect.value });
+    onDesignChange({ fontFamily: fontSelect.value });
   });
 
   const fontGroup = el("div", { className: "ribbon-group" }, [
@@ -84,7 +86,7 @@ function buildInicioPanel(design, onDesignChange) {
     const btn = el("button", {
       className: `ribbon-btn${isActive ? " ribbon-btn--active" : ""}`,
       textContent: s.label,
-      onClick: () => onDesignChange({ ...design, scale: s.value }),
+      onClick: () => onDesignChange({ scale: s.value }),
     });
     return btn;
   });
@@ -100,7 +102,7 @@ function buildInicioPanel(design, onDesignChange) {
     return el("button", {
       className: `ribbon-btn${isActive ? " ribbon-btn--active" : ""}`,
       textContent: a.label,
-      onClick: () => onDesignChange({ ...design, textAlign: a.value }),
+      onClick: () => onDesignChange({ textAlign: a.value }),
     });
   });
 
@@ -137,7 +139,7 @@ function clearPanel() {
   }
 }
 
-function openTab(tabName, design, onDesignChange) {
+function openTab(tabName) {
   const panel = getPanelEl();
   if (!panel) return;
 
@@ -151,7 +153,7 @@ function openTab(tabName, design, onDesignChange) {
 
   const builder = panelBuilders[tabName];
   if (builder) {
-    panel.appendChild(builder(design, onDesignChange));
+    panel.appendChild(builder(state.currentDesign, state.onDesignChange));
     panel.classList.add("open");
   } else {
     panel.classList.remove("open");
@@ -175,23 +177,29 @@ function updateTabStyles() {
 }
 
 function init(design, onDesignChange) {
+  state.currentDesign = design;
+  state.onDesignChange = onDesignChange;
+
   const links = document.querySelectorAll(".ribbon a");
 
   links.forEach((link) => {
     link.addEventListener("click", (e) => {
       e.preventDefault();
       const tabName = link.dataset.tab;
-      if (tabName) openTab(tabName, design, onDesignChange);
+      if (tabName) openTab(tabName);
     });
   });
 }
 
 function refresh(design, onDesignChange) {
+  state.currentDesign = design;
+  state.onDesignChange = onDesignChange;
+
   if (state.activeTab && panelBuilders[state.activeTab]) {
     const panel = getPanelEl();
     if (panel) {
       panel.innerHTML = "";
-      panel.appendChild(panelBuilders[state.activeTab](design, onDesignChange));
+      panel.appendChild(panelBuilders[state.activeTab](state.currentDesign, state.onDesignChange));
     }
   }
 }

@@ -17,8 +17,8 @@ function applyDesign() {
   stage.style.setProperty("--slide-align", design.textAlign);
 }
 
-function onDesignChange(newDesign) {
-  design = { ...newDesign };
+function onDesignChange(changes) {
+  design = { ...design, ...changes };
   applyDesign();
   Ribbon.refresh(design, onDesignChange);
 }
